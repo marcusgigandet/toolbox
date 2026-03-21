@@ -67,12 +67,14 @@ class CopyrightEnforcer:
         default_year: str,
         extensions: tuple[str, ...],
         fix: bool,
+        verbose: bool,
     ):
         self.src_dir = root_dir
         self.author = author
         self.default_year = default_year
         self.extensions = extensions
         self.fix = fix
+        self.verbose = verbose
         self.violations: list[Path] = []
 
     def git_years(self, file: Path) -> tuple[str, str]:
@@ -229,21 +231,39 @@ def main() -> int:
         default="./",
         help="Directory being checked relative to calling directory",
     )
-    parser.add_argument("--author", default="")
-    parser.add_argument("--default-year", default=f"{datetime.datetime.now().year}")
-    parser.add_argument("--fix", action="store_true", help="Auto-fix violations")
+    parser.add_argument(
+        "--author",
+        default="",
+    )
+    parser.add_argument(
+        "--default-year",
+        default=f"{datetime.datetime.now().year}",
+    )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Auto-fix violations",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Display all log messages",
+    )
     args = parser.parse_args()
 
+    # Todo: Add support for custom extensions and additional languages
     enforcer = CopyrightEnforcer(
         root_dir=Path(args.directory),
         author=args.author,
         default_year=args.default_year,
         extensions=(".c", ".cpp", ".cppm", ".cxx", ".cc", ".c++", ".hpp", ".h", ".h++"),
         fix=args.fix,
+        verbose=args.verbose,
     )
 
     copyright_return_status = enforcer.run()
-    print(copyright_return_status)
+    if args.verbose:
+        print(copyright_return_status)
     return copyright_return_status.number
 
 
