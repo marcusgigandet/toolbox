@@ -1,0 +1,78 @@
+# --- General ---
+.DS_Store
+Thumbs.db
+*.log
+*.temp
+*.bak
+*.swp
+*.swo
+
+# --- Editors/IDEs ---
+# Visual Studio
+.vscode/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.ncb
+*.log
+*.opensdf
+*.sdf
+ipch/
+*.aps
+*.pch
+*.vs/
+
+# CLion
+.idea/
+*.iml
+cmake-build-*/
+
+# Other IDEs/Editors
+*.kate-swp
+*.swp
+*.swo
+
+# --- Temporary Files ---
+*.tmp
+*.temp
+*.log
+*.bak
+*.old
+*.pyc
+*.class
+
+# --- Output Folders ---
+bin/
+obj/
+lib/
+dist/
+api/
+
+# --- Other Tools ---
+*.iobj
+*.ipdb
+*.rsp
+*.tlog
+*.log
+*.idb
+
+# --- Backup Files ---
+*~
+*.orig
+*.bak
+*.backup
+
+# --- Miscellaneous ---
+*.tags
+*.lint
+*.session
+*.cache
+*.log
+.venv/
+
+# --- Coverage Reports ---
+coverage/
+lcov-report/

@@ -1,0 +1,52 @@
+name: Verify Copyright Headers
+
+on:
+  workflow_call:
+    inputs:
+      author:
+        description: 'Author of the copyright'
+        required: true
+        type: string
+      directories:
+        description: 'Directories to check (space-separated)'
+        required: true
+        type: string
+
+jobs:
+  verify-copyright:
+    name: Verify Copyright Headers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout toolbox repository
+        uses: actions/checkout@v4
+        with:
+          repository: SlyFryFrog/toolbox
+          path: toolbox
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Verify copyright headers
+        run: |
+          python3 toolbox/scripts/copyright.py \
+            --author "${{ inputs.author }}" \
+           	--directory "${{ inputs.directories }}"
+
+      - name: Show diff if violations found
+        if: failure()
+        run: |
+          echo "::error::Copyright header violations found"
+          python3 toolbox/scripts/copyright.py \
+            --author "${{ inputs.author }}" \
+            --directory "${{ inputs.directories }}" \
+            --fix
+          git diff
+          exit 1
