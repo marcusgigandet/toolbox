@@ -341,6 +341,8 @@ def main() -> int:
 
     parser.add_argument("--config", default="config.toml")
     parser.add_argument("--directory", default=".")
+    parser.add_argument("--fix", action="store_true")
+    parser.add_argument("--override", action="store_true")
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
@@ -357,7 +359,7 @@ def main() -> int:
         author=config["tool"]["author"],
         default_year=str(datetime.datetime.now().year),
         license_name=config["tool"]["license"],
-        fix=config["tool"]["fix"],
+        fix=args.fix if args.fix or args.override else config["tool"]["fix"],
         verbose=args.verbose,
     )
 

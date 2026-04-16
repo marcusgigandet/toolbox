@@ -3,12 +3,12 @@ name: Verify Copyright Headers
 on:
   workflow_call:
     inputs:
-      author:
-        description: 'Author of the copyright'
+      config:
+        description: 'Toml config for the copyright tool'
         required: true
         type: string
-      directories:
-        description: 'Directories to check (space-separated)'
+      directory:
+        description: 'Root directory to check recursively'
         required: true
         type: string
 
@@ -36,17 +36,19 @@ jobs:
 
       - name: Verify copyright headers
         run: |
-          python3 toolbox/scripts/copyright.py \
-            --author "${{ inputs.author }}" \
-           	--directory "${{ inputs.directories }}"
+          python3 toolbox/scripts/copyright/copyright.py \
+            --config "${{ inputs.config }}" \
+           	--directory "${{ inputs.directory }}" \
+            --override
 
       - name: Show diff if violations found
         if: failure()
         run: |
           echo "::error::Copyright header violations found"
-          python3 toolbox/scripts/copyright.py \
-            --author "${{ inputs.author }}" \
-            --directory "${{ inputs.directories }}" \
-            --fix
+          python3 toolbox/scripts/copyright/copyright.py \
+            --config "${{ inputs.config }}" \
+            --directory "${{ inputs.directory }}" \
+            --fix \
+            --override
           git diff
           exit 1
