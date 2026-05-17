@@ -76,3 +76,7 @@ api/
 # --- Coverage Reports ---
 coverage/
 lcov-report/
+
+# Python files
+__pycache__/
+.mypy_cache/

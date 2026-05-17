@@ -1,8 +1,9 @@
-[tool]
+[copyright]
 fix = true
 default_year = "2026"
 author = "Marcus Gigandet"
 license = "apache_2_0"
+exclude = ["__init__\\.py$", "__ignore__\\.c$"]
 
 [licenses.apache_2_0]
 text = """

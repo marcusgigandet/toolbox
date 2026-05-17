@@ -4,18 +4,18 @@ function(enforce_copyright)
     set(multiValueArgs "")
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    if(NOT ARG_SCRIPT_DIR)
-        set(ARG_SCRIPT_DIR "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../scripts/copyright")
-    endif()
-
     add_custom_target(enforce_copyright
-            COMMAND python3 "${ARG_SCRIPT_DIR}/copyright.py"
+            COMMAND python3 -m scripts.copyright
             --config "${ARG_CONFIG_FILE}"
             --directory "${ARG_SOURCE_DIR}"
             COMMENT "Syncing copyright headers with Git history"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/.."
             VERBATIM
     )
-    add_dependencies(${ARG_TARGET} enforce_copyright)
+
+    if (ARG_TARGET)
+        add_dependencies(${ARG_TARGET} enforce_copyright)
+    endif ()
 endfunction()
 
 function(enforce_clang_format)

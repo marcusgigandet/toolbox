@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import argparse
 import datetime
 import re
 import subprocess
-import sys
 import tomllib
 from dataclasses import dataclass
 from enum import Enum
@@ -27,9 +25,14 @@ from typing import Optional
 
 
 class CopyrightStatus(Enum):
+    """
+    Copyright status enumeration for license validation results.
+    """
+
     SUCCESS = (0, "OK", "No issues found")
     MISSING_HEADER = (1, "E001", "No license header found")
     NO_LICENSE_GIVEN = (2, "E002", "No license provided")
+    NO_CONFIG = (3, "E003", "No configuration toml was provided")
 
     def __init__(self, number: int, short_code: str, message: str):
         self.number = number
@@ -42,20 +45,27 @@ class CopyrightStatus(Enum):
 
 @dataclass(frozen=True)
 class CommentStyle:
+    """
+    Immutable dataclass representing comment style delimiters.
+    """
+
     block_start: Optional[str]
     block_end: Optional[str]
     line_prefix: Optional[str]
 
 
-def load_config(path: Path) -> dict:
+def load_config(path: Path) -> dict | None:
     """
     Loads the TOML configuration file.
 
     :param path: Path to TOML config file.
     :return: Parsed configuration dictionary.
     """
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+    if path.exists():
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    else:
+        return None
 
 
 def get_language(file: Path, config: dict):
@@ -88,7 +98,7 @@ def load_license(name: str, config: dict) -> str:
     lic = licenses[name]
 
     if "file" in lic:
-        return Path(lic["file"]).read_text()
+        return Path(lic["file"]).read_text(encoding="utf-8")
 
     if "text" in lic:
         return lic["text"]
@@ -107,9 +117,12 @@ def format_header(text: str, style: CommentStyle) -> str:
     lines = [line.strip() for line in text.strip().splitlines()]
 
     if style.block_start:
+        line_prefix = ""
+        if style.line_prefix:
+            line_prefix = style.line_prefix
+
         body = "\n".join(
-            f"{style.line_prefix}{line}" if line else style.line_prefix.rstrip()
-            for line in lines
+            f"{line_prefix}{line}" if line else line_prefix.rstrip() for line in lines
         )
         return f"{style.block_start}\n{body}\n{style.block_end}\n\n"
 
@@ -155,15 +168,19 @@ def has_header_at_top(text: str, style: CommentStyle) -> bool:
 
 
 class CopyrightEnforcer:
+    """
+    Enforces copyright headers in source files based on configuration.
+
+    Validates and optionally fixes copyright headers in files matching configured languages.
+    Uses git history to determine appropriate copyright years.
+    """
+
     YEAR_REGEX = re.compile(r"(Copyright) ([0-9]{4})(-[0-9]{4})?")
 
     def __init__(
         self,
         config: dict,
         root_dir: Path,
-        author: str,
-        default_year: str,
-        license_name: str,
         fix: bool,
         verbose: bool,
     ):
@@ -178,17 +195,13 @@ class CopyrightEnforcer:
         :param fix: Whether to automatically fix issues.
         :param verbose: Enable verbose output.
         """
-        self.config = config
-        self.root_dir = root_dir
-        self.author = author
-        self.default_year = default_year
-        self.fix = fix
-        self.verbose = verbose
+        self._config = config
+        self._root_dir = root_dir
+        self._default_year = str(datetime.datetime.now().year)
+        self._fix = fix
+        self._verbose = verbose
 
-        self.license_name = license_name
-        self.license_text = load_license(license_name, config)
-
-        self.violations: list[Path] = []
+        self._violations: list[Path] = []
 
     def git_years(self, file: Path) -> tuple[str, str]:
         """
@@ -209,20 +222,22 @@ class CopyrightEnforcer:
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             ).stdout.splitlines()[-1]
-        except Exception:
-            start = self.default_year
+        except (subprocess.CalledProcessError, IndexError):
+            start = self._default_year
 
         try:
             end = subprocess.run(
                 ["git", "log", "-1", "--format=%cd", "--date=format:%Y", str(file)],
                 capture_output=True,
                 text=True,
+                check=False,
             ).stdout.strip()
-        except Exception:
-            end = self.default_year
+        except (subprocess.CalledProcessError, IndexError):
+            end = self._default_year
 
-        return start or self.default_year, end or self.default_year
+        return start or self._default_year, end or self._default_year
 
     def expected_years(self, file: Path) -> str:
         """
@@ -232,6 +247,7 @@ class CopyrightEnforcer:
         :return: Year or year range string.
         """
         start, end = self.git_years(file)
+
         return start if start == end else f"{start}-{end}"
 
     def matches_language(self, file: Path) -> bool:
@@ -241,7 +257,7 @@ class CopyrightEnforcer:
         :param file: File being checked.
         :return: True if file should be processed.
         """
-        return get_language(file, self.config) is not None
+        return get_language(file, self._config) is not None
 
     def check_file(self, file: Path) -> bool:
         """
@@ -250,7 +266,7 @@ class CopyrightEnforcer:
         :param file: File being checked.
         :return: True if valid, False otherwise.
         """
-        lang = get_language(file, self.config)
+        lang = get_language(file, self._config)
         if not lang:
             return True
 
@@ -263,7 +279,7 @@ class CopyrightEnforcer:
         text = file.read_text(encoding="utf-8", errors="ignore")
 
         if not has_header_at_top(text, style):
-            if self.verbose:
+            if self._verbose:
                 print(f"LOG: No header at top of {file}")
             return False
 
@@ -276,7 +292,7 @@ class CopyrightEnforcer:
 
         :param file: File being fixed.
         """
-        lang = get_language(file, self.config)
+        lang = get_language(file, self._config)
         if not lang:
             return
 
@@ -288,9 +304,11 @@ class CopyrightEnforcer:
 
         expected_years = self.expected_years(file)
 
-        header_text = self.license_text.format(
+        header_text = load_license(
+            self._config["copyright"]["license"], self._config
+        ).format(
             years=expected_years,
-            author=self.author,
+            author=self._config["copyright"]["author"],
         )
 
         header = format_header(header_text, style)
@@ -314,8 +332,8 @@ class CopyrightEnforcer:
             return
 
         if not self.check_file(file):
-            self.violations.append(file)
-            if self.fix:
+            self._violations.append(file)
+            if self._fix:
                 self.fix_file(file)
 
     def run(self) -> CopyrightStatus:
@@ -324,59 +342,25 @@ class CopyrightEnforcer:
 
         :return: Execution status.
         """
-        for file in self.root_dir.rglob("*"):
-            if file.is_file():
-                self.process_file(file)
 
-        if self.violations:
-            for i, file in enumerate(self.violations):
-                print(f"[{i + 1}/{len(self.violations)}] Fixing {file}")
+        exclude_patterns = self._config["copyright"]["exclude"]
 
-            if not self.fix:
+        for file in self._root_dir.rglob("*"):
+            if not file.is_file():
+                continue
+
+            relative_path = str(file.relative_to(self._root_dir))
+
+            if any(re.search(pattern, relative_path) for pattern in exclude_patterns):
+                continue
+
+            self.process_file(file)
+
+        if self._violations:
+            for i, file in enumerate(self._violations):
+                print(f"[{i + 1}/{len(self._violations)}] Fixing {file}")
+
+            if not self._fix:
                 return CopyrightStatus.MISSING_HEADER
 
         return CopyrightStatus.SUCCESS
-
-
-def main() -> int:
-    """
-    Entry-point for the copyright script.
-
-    :return: Exit code.
-    """
-    parser = argparse.ArgumentParser(description="Copyright enforcement tool")
-
-    parser.add_argument("--config", default="config.toml")
-    parser.add_argument("--directory", default=".")
-    parser.add_argument("--fix", action="store_true")
-    parser.add_argument("--override", action="store_true")
-    parser.add_argument("--verbose", action="store_true")
-
-    args = parser.parse_args()
-
-    config = load_config(Path(args.config))
-
-    # Check for license
-    if not config["tool"]["license"]:
-        return CopyrightStatus.NO_LICENSE_GIVEN.number
-
-    enforcer = CopyrightEnforcer(
-        config=config,
-        root_dir=Path(args.directory),
-        author=config["tool"]["author"],
-        default_year=str(datetime.datetime.now().year),
-        license_name=config["tool"]["license"],
-        fix=args.fix if args.fix or args.override else config["tool"]["fix"],
-        verbose=args.verbose,
-    )
-
-    status = enforcer.run()
-
-    if args.verbose:
-        print(status)
-
-    return status.number
-
-
-if __name__ == "__main__":
-    sys.exit(main())
