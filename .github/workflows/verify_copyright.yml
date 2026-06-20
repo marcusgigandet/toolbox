@@ -19,12 +19,12 @@ jobs:
 
     steps:
       - name: Checkout calling repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Checkout toolbox repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: SlyFryFrog/toolbox
           path: toolbox
